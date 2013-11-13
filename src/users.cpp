@@ -692,39 +692,6 @@ bool User::ChangeNick(const std::string& newnick, bool force)
 				}
 			}
 		}
-
-		/*
-		 * Uh oh.. if the nickname is in use, and it's not in use by the person using it (doh) --
-		 * then we have a potential collide. Check whether someone else is camping on the nick
-		 * (i.e. connect -> send NICK, don't send USER.) If they are camping, force-change the
-		 * camper to their UID, and allow the incoming nick change.
-		 *
-		 * If the guy using the nick is already using it, tell the incoming nick change to gtfo,
-		 * because the nick is already (rightfully) in use. -- w00t
-		 */
-		User* InUse = ServerInstance->FindNickOnly(newnick);
-		if (InUse && (InUse != this))
-		{
-			if (InUse->registered != REG_ALL)
-			{
-				/* force the camper to their UUID, and ask them to re-send a NICK. */
-				InUse->WriteTo(InUse, "NICK %s", InUse->uuid.c_str());
-				InUse->WriteNumeric(ERR_NICKNAMEINUSE, "%s :Nickname overruled.", InUse->nick.c_str());
-
-				ServerInstance->Users->clientlist->erase(InUse->nick);
-				(*(ServerInstance->Users->clientlist))[InUse->uuid] = InUse;
-
-				InUse->nick = InUse->uuid;
-				InUse->InvalidateCache();
-				InUse->registered &= ~REG_NICK;
-			}
-			else
-			{
-				/* No camping, tell the incoming user  to stop trying to change nick ;p */
-				this->WriteNumeric(ERR_NICKNAMEINUSE, "%s :Nickname is already in use.", newnick.c_str());
-				return false;
-			}
-		}
 	}
 
 	if (this->registered == REG_ALL)
@@ -897,7 +864,7 @@ void User::WriteNumeric(unsigned int numeric, const std::string &text)
 
 	if (MOD_RESULT == MOD_RES_DENY)
 		return;
-	
+
 	const std::string message = InspIRCd::Format(":%s %03u %s %s", ServerInstance->Config->ServerName.c_str(),
 		numeric, !this->nick.empty() ? this->nick.c_str() : "*", text.c_str());
 	this->Write(message);
